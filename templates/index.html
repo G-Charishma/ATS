@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATS Core | Resume Analyzer</title>
+    <style>
+        :root {
+            --bg: #0b0f1a;
+            --surface: #161b2a;
+            --accent: #6366f1;
+            --text: #f8fafc;
+            --border: #2d3748;
+            --success: #10b981;
+            --danger: #f43f5e;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 550px;
+            padding: 20px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        h2 { font-size: 1.25rem; margin-bottom: 1.5rem; font-weight: 600; text-align: center; color: var(--accent); }
+
+        .input-box { margin-bottom: 1.25rem; }
+        label { display: block; font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem; letter-spacing: 1.2px; font-weight: 700; }
+        
+        input, textarea {
+            width: 100%;
+            background: #0b0f1a;
+            border: 1px solid var(--border);
+            color: white;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+            transition: 0.2s;
+        }
+
+        input:focus, textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); }
+
+        .file-area {
+            border: 2px dashed var(--border);
+            padding: 1.5rem;
+            text-align: center;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .file-area:hover { border-color: var(--accent); color: var(--text); background: rgba(99, 102, 241, 0.05); }
+
+        .btn {
+            background: var(--accent);
+            color: white;
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: 0.3s ease;
+        }
+
+        .btn:hover { background: #4f46e5; transform: translateY(-1px); }
+
+        /* Results Display */
+        #results { display: none; }
+        
+        .score-circle {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .score-val { font-size: 4.5rem; font-weight: 800; color: white; margin: 0; }
+        .score-sub { color: #94a3b8; font-size: 0.8rem; margin-top: -10px; }
+
+        .feedback-section { margin-top: 2rem; }
+        .list-container {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border);
+        }
+
+        .list-title { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; margin-bottom: 10px; display: block; }
+        .plus-title { color: var(--success); }
+        .minus-title { color: var(--danger); }
+
+        ul { margin: 0; padding-left: 1rem; font-size: 0.85rem; color: #cbd5e1; }
+        li { margin-bottom: 8px; line-height: 1.4; }
+
+        .back-btn { background: transparent; color: #64748b; border: 1px solid var(--border); margin-top: 10px; }
+        .back-btn:hover { color: white; border-color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card" id="inputForm">
+        <h2>Resume Ranker</h2>
+        
+        <div class="input-box">
+            <label>Target Company</label>
+            <input type="text" id="companyInput" placeholder="e.g. Microsoft, Stripe, Tesla">
+        </div>
+
+        <div class="input-box">
+            <label>Job Description <span style="font-weight: 400; opacity: 0.6;">(Optional)</span></label>
+            <textarea id="jdInput" rows="4" placeholder="Paste the job post to improve accuracy..."></textarea>
+        </div>
+
+        <div class="file-area" onclick="document.getElementById('fileIn').click()">
+            <span id="fileName">Drop resume here or click to browse</span>
+            <input type="file" id="fileIn" hidden accept=".pdf,.docx">
+        </div>
+
+        <button class="btn" onclick="runATS()">Analyze Match</button>
+    </div>
+
+    <div class="card" id="results">
+        <div class="score-circle">
+            <p id="compLabel" style="color: var(--accent); font-weight: 600; margin-bottom: 5px;"></p>
+            <h1 class="score-val" id="score">0</h1>
+            <div class="score-sub">ATS MATCH SCORE</div>
+        </div>
+
+        <div class="feedback-section">
+            <div class="list-container">
+                <span class="list-title plus-title">✓ Advantages</span>
+                <ul id="pros"></ul>
+            </div>
+            
+            <div class="list-container">
+                <span class="list-title minus-title">⚠ Disadvantages</span>
+                <ul id="cons"></ul>
+            </div>
+        </div>
+
+        <button class="btn back-btn" onclick="location.reload()">Upload New</button>
+    </div>
+</div>
+
+<script>
+    const fileIn = document.getElementById('fileIn');
+    fileIn.onchange = () => {
+        if(fileIn.files[0]) document.getElementById('fileName').innerText = "Selected: " + fileIn.files[0].name;
+    };
+
+    function runATS() {
+        const company = document.getElementById('companyInput').value;
+        const file = fileIn.files[0];
+
+        if(!company || !file) {
+            alert("Please provide the company name and upload your resume.");
+            return;
+        }
+
+        // UI Transition
+        document.getElementById('inputForm').style.display = 'none';
+        document.getElementById('results').style.display = 'block';
+
+        // Content Update
+        document.getElementById('compLabel').innerText = "Match for " + company;
+        
+        // Example mock analysis
+        const rank = 74; 
+        document.getElementById('score').innerText = rank;
+
+        const proData = [
+            "Strong formatting with clear section headers",
+            "Consistent use of action-oriented bullet points",
+            "High compatibility with " + company + "'s typical tech stack"
+        ];
+        
+        const conData = [
+            "Missing specific metrics (e.g., %, $, time saved)",
+            "Summary section contains generic buzzwords",
+            "File format might be complex for older ATS parsers"
+        ];
+
+        document.getElementById('pros').innerHTML = proData.map(t => `<li>${t}</li>`).join('');
+        document.getElementById('cons').innerHTML = conData.map(t => `<li>${t}</li>`).join('');
+    }
+</script>
+
+</body>
+</html>
